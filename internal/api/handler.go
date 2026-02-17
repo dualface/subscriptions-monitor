@@ -17,6 +17,14 @@ func (s *Server) usageHandler(w http.ResponseWriter, r *http.Request) {
 	providerFilter := r.URL.Query().Get("provider")
 	nameFilter := r.URL.Query().Get("name")
 
+	if data, ok := s.cache.Get(); ok {
+		filtered := s.filterSnapshots(data, providerFilter, nameFilter)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Cache", "HIT")
+		json.NewEncoder(w).Encode(filtered)
+		return
+	}
+
 	var filteredSubs []provider.SubscriptionEntry
 	for _, sub := range s.config.Subscriptions {
 		if providerFilter != "" && sub.Provider != providerFilter {
@@ -34,7 +42,26 @@ func (s *Server) usageHandler(w http.ResponseWriter, r *http.Request) {
 	snapshots := s.registry.FetchAll(ctx, filteredSubs)
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
 	json.NewEncoder(w).Encode(snapshots)
+}
+
+func (s *Server) filterSnapshots(snapshots []provider.UsageSnapshot, providerFilter, nameFilter string) []provider.UsageSnapshot {
+	if providerFilter == "" && nameFilter == "" {
+		return snapshots
+	}
+
+	var filtered []provider.UsageSnapshot
+	for _, snap := range snapshots {
+		if providerFilter != "" && snap.ProviderID != providerFilter {
+			continue
+		}
+		if nameFilter != "" && snap.Name != nameFilter {
+			continue
+		}
+		filtered = append(filtered, snap)
+	}
+	return filtered
 }
 
 func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
