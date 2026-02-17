@@ -22,42 +22,32 @@ func PrintJSON(data interface{}) error {
 }
 
 func PrintTable(snapshots []provider.UsageSnapshot) error {
+	cellStyle := lipgloss.NewStyle().Padding(0, 1)
+
 	t := table.New().
-		Border(lipgloss.NormalBorder()).
+		Border(lipgloss.ASCIIBorder()).
 		BorderRow(true).
-		Headers("PROVIDER", "NAME", "PLAN", "USAGE", "COST")
+		StyleFunc(func(row, col int) lipgloss.Style {
+			return cellStyle
+		}).
+		Headers("NAME", "PLAN", "USAGE")
 
 	for _, s := range snapshots {
 		t.Row(
-			formatProvider(s),
 			s.Name,
 			formatPlan(s.Plan),
 			formatUsage(s.Metrics),
-			formatCost(s.Cost),
 		)
 	}
 
-	header := lipgloss.NewStyle().Bold(true).Render("AI Subscriptions Usage")
-	footer := lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("Updated: %s", time.Now().Format(time.RFC1123)))
+	header := "AI Subscriptions Usage"
+	footer := fmt.Sprintf("Updated: %s", time.Now().Format(time.RFC1123))
 
 	fmt.Println(header)
 	fmt.Println(t)
 	fmt.Println(footer)
 
 	return nil
-}
-
-func formatProvider(s provider.UsageSnapshot) string {
-	var statusIcon string
-	switch s.Status {
-	case provider.StatusOK:
-		statusIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("✓")
-	case provider.StatusError:
-		statusIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("✗")
-	case provider.StatusUnauthorized:
-		statusIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("⚠")
-	}
-	return fmt.Sprintf("%s %s", statusIcon, s.DisplayName)
 }
 
 func formatPlan(p *provider.PlanInfo) string {
@@ -79,39 +69,59 @@ func formatUsage(metrics []provider.UsageMetric) string {
 }
 
 func formatMetric(m provider.UsageMetric) string {
-	// Case 1: No data at all
 	if m.Amount.Used == nil && m.Amount.Limit == nil {
 		return fmt.Sprintf("%s: N/A", m.Name)
 	}
 
-	// Case 2: Has both Used and Limit - show progress bar
+	var resetInfo string
+	if m.Window.ResetsAt != nil {
+		remaining := time.Until(*m.Window.ResetsAt)
+		if remaining > 0 {
+			resetInfo = fmt.Sprintf("  resets in %s", formatDuration(remaining))
+		} else {
+			resetInfo = "  resets soon"
+		}
+	}
+
+	var usageLine string
 	if m.Amount.Used != nil && m.Amount.Limit != nil {
 		percent := (*m.Amount.Used / *m.Amount.Limit) * 100
 		bar := progressBar(percent)
-		return fmt.Sprintf("%s %s %.0f%%", m.Name, bar, percent)
+		usageLine = fmt.Sprintf("%s %s %.0f%%", m.Name, bar, percent)
+	} else if m.Amount.Used != nil {
+		usageLine = fmt.Sprintf("%s: %s %s", m.Name, formatNumber(*m.Amount.Used), m.Amount.Unit)
+	} else {
+		usageLine = fmt.Sprintf("%s: -/%s %s", m.Name, formatNumber(*m.Amount.Limit), m.Amount.Unit)
 	}
 
-	// Case 3: Only Used, no Limit - show value only (e.g., Total Tokens, API Requests)
-	if m.Amount.Used != nil {
-		return fmt.Sprintf("%s: %s %s", m.Name, formatNumber(*m.Amount.Used), m.Amount.Unit)
+	if resetInfo != "" {
+		return usageLine + "\n" + resetInfo
 	}
-
-	// Case 4: Only Limit, no Used
-	return fmt.Sprintf("%s: -/%s %s", m.Name, formatNumber(*m.Amount.Limit), m.Amount.Unit)
+	return usageLine
 }
 
-func formatCost(c *provider.CostBreakdown) string {
-	if c == nil {
-		return "N/A"
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
 	}
-	return fmt.Sprintf("$%.2f", c.Total)
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	if hours == 0 {
+		return fmt.Sprintf("%dd", days)
+	}
+	return fmt.Sprintf("%dd%dh", days, hours)
 }
 
 func progressBar(percent float64) string {
 	width := 10
 
-	// Handle NaN and negative values
-	if percent < 0 || percent != percent { // NaN check
+	if percent < 0 || percent != percent {
 		percent = 0
 	}
 	if percent > 100 {
@@ -121,9 +131,9 @@ func progressBar(percent float64) string {
 	filled := int((percent / 100) * float64(width))
 	empty := width - filled
 
-	return fmt.Sprintf("%s%s",
-		lipgloss.NewStyle().Render(strings.Repeat("█", filled)),
-		lipgloss.NewStyle().Faint(true).Render(strings.Repeat("░", empty)),
+	return fmt.Sprintf("[%s%s]",
+		strings.Repeat("#", filled),
+		strings.Repeat("-", empty),
 	)
 }
 

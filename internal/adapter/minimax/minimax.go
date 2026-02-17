@@ -94,15 +94,18 @@ func (a *Adapter) FetchUsage(ctx context.Context, auth provider.AuthConfig) (*pr
 
 	if remainsResp != nil && len(remainsResp.ModelRemains) > 0 {
 		for _, remain := range remainsResp.ModelRemains {
-			// CurrentIntervalUsageCount is remaining count, not used count
 			remaining := remain.CurrentIntervalUsageCount
 			total := remain.CurrentIntervalTotalCount
 			used := total - remaining
+
+			resetsAt := time.UnixMilli(remain.EndTime)
+
 			metrics = append(metrics, provider.UsageMetric{
 				Name: fmt.Sprintf("%s Usage", remain.ModelName),
 				Window: provider.UsageWindow{
-					ID:    "interval",
-					Label: "Current Interval",
+					ID:       "interval",
+					Label:    "Current Interval",
+					ResetsAt: &resetsAt,
 				},
 				Amount: provider.UsageAmount{
 					Used:      provider.Ptr(float64(used)),
