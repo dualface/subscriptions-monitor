@@ -1,0 +1,37 @@
+# AI Subscriptions Monitor Configuration
+# Place this file at ~/.config/sub-mon/config.yaml or use --config flag
+
+# Subscriptions configuration
+subscriptions:
+  # Kimi Code subscription
+  - name: my-kimi
+    provider: kimi
+    auth:
+      type: cookie
+      extra:
+        auth_token: "${KIMI_AUTH_TOKEN}"
+        cookie: "${KIMI_COOKIE}"
+
+  # MiniMax subscription
+  - name: my-minimax
+    provider: minimax
+    auth:
+      type: cookie
+      extra:
+        cookie: "${MINIMAX_COOKIE}"
+        group_id: "${MINIMAX_GROUP_ID}"
+
+  # ZenMux subscription
+  - name: my-zenmux
+    provider: zenmux
+    auth:
+      type: cookie
+      extra:
+        ctoken: "${ZENMUX_CTOKEN}"
+        session_id: "${ZENMUX_SESSION_ID}"
+        session_id_sig: "${ZENMUX_SESSION_ID_SIG}"
+
+# Application settings
+settings:
+  timeout: 30s           # Request timeout for fetching data
+  api_port: 3456         # Port for serve command

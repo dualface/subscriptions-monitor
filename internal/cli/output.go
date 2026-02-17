@@ -41,13 +41,48 @@ func PrintTable(snapshots []provider.UsageSnapshot) error {
 	}
 
 	header := "AI Subscriptions Usage"
-	footer := fmt.Sprintf("Updated: %s", time.Now().Format(time.RFC1123))
+	footer := fmt.Sprintf("Updated: %s", formatRefreshTime(snapshots))
 
 	fmt.Println(header)
 	fmt.Println(t)
 	fmt.Println(footer)
 
 	return nil
+}
+
+func formatRefreshTime(snapshots []provider.UsageSnapshot) string {
+	if len(snapshots) == 0 {
+		return "never"
+	}
+
+	var oldest time.Time
+	for _, s := range snapshots {
+		if oldest.IsZero() || s.Timestamp.Before(oldest) {
+			oldest = s.Timestamp
+		}
+	}
+
+	age := time.Since(oldest)
+	relative := formatAge(age)
+
+	return fmt.Sprintf("%s (%s)", oldest.Format("2006-01-02 15:04:05"), relative)
+}
+
+func formatAge(age time.Duration) string {
+	if age < time.Second {
+		return "just now"
+	}
+	if age < time.Minute {
+		return fmt.Sprintf("%ds ago", int(age.Seconds()))
+	}
+	if age < time.Hour {
+		return fmt.Sprintf("%dm ago", int(age.Minutes()))
+	}
+	if age < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(age.Hours()))
+	}
+	days := int(age.Hours()) / 24
+	return fmt.Sprintf("%dd ago", days)
 }
 
 func formatPlan(p *provider.PlanInfo) string {
