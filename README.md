@@ -2,6 +2,29 @@
 
 AI service subscription usage monitor supporting Kimi, MiniMax, and ZenMux.
 
+```txt
+AI Subscriptions Usage
++-----------+--------------------------+----------------------------------+
+| NAME      | PLAN                     | USAGE                            |
++-----------+--------------------------+----------------------------------+
+| ZenMux    | Ultra Plan               | 7d Flows [######----] 69%        |
+|           |                          |   resets in 2d19h                |
+|           |                          | 5h Flows [#####-----] 51%        |
+|           |                          |   resets in 27m                  |
+|           |                          | Total Tokens: 504.9M tokens      |
+|           |                          | API Requests: 6.9K requests      |
++-----------+--------------------------+----------------------------------+
+| Kimi Code | Moderato                 | Daily Requests [#---------] 13%  |
+|           |                          |   resets in 2d14h                |
+|           |                          | Window (300m) [----------] 0%    |
+|           |                          |   resets in 3h                   |
++-----------+--------------------------+----------------------------------+
+| MiniMax   | CodePlanStarter-月度会员 | MiniMax-M2 Usage [----------] 0% |
+|           |                          |   resets in 1m                   |
++-----------+--------------------------+----------------------------------+
+Updated: 2026-02-17 19:58:01 (just now)
+```
+
 ## Installation
 
 ```bash
