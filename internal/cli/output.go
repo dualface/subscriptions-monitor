@@ -33,10 +33,15 @@ func PrintTable(snapshots []provider.UsageSnapshot) error {
 		Headers("NAME", "PLAN", "USAGE")
 
 	for _, s := range snapshots {
+		usage := formatUsage(s.Metrics)
+		if s.Status == provider.StatusError {
+			usage = formatErrorUsage(s.Error)
+		}
+
 		t.Row(
 			s.Name,
 			formatPlan(s.Plan),
-			formatUsage(s.Metrics),
+			usage,
 		)
 	}
 
@@ -101,6 +106,13 @@ func formatUsage(metrics []provider.UsageMetric) string {
 		parts = append(parts, formatMetric(m))
 	}
 	return strings.Join(parts, "\n")
+}
+
+func formatErrorUsage(errMsg string) string {
+	if strings.TrimSpace(errMsg) == "" {
+		return "Fetch failed: unknown error"
+	}
+	return "Fetch failed: " + errMsg
 }
 
 func formatMetric(m provider.UsageMetric) string {

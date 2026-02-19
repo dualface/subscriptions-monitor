@@ -1,17 +1,50 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	originalStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stderr = w
+
+	fn()
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close pipe writer: %v", err)
+	}
+	os.Stderr = originalStderr
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("failed to read captured stderr: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("failed to close pipe reader: %v", err)
+	}
+
+	return buf.String()
+}
 
 type mockProvider struct {
 	id          string
 	displayName string
 	failFetch   bool
+	statusError bool
 }
 
 func (m *mockProvider) ID() string {
@@ -36,6 +69,14 @@ func (m *mockProvider) ValidateAuth(ctx context.Context, auth AuthConfig) error 
 func (m *mockProvider) FetchUsage(ctx context.Context, auth AuthConfig) (*UsageSnapshot, error) {
 	if m.failFetch {
 		return nil, errors.New("failed to fetch usage")
+	}
+	if m.statusError {
+		return &UsageSnapshot{
+			ProviderID:  m.id,
+			DisplayName: m.displayName,
+			Status:      StatusError,
+			Error:       "upstream parsing failed",
+		}, nil
 	}
 	return &UsageSnapshot{
 		ProviderID:  m.id,
@@ -127,7 +168,10 @@ func TestRegistry_FetchAll(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	snapshots := r.FetchAll(ctx, entries)
+	var snapshots []UsageSnapshot
+	warnings := captureStderr(t, func() {
+		snapshots = r.FetchAll(ctx, entries)
+	})
 
 	// Should return one result per entry, preserving order
 	if len(snapshots) != 3 {
@@ -152,6 +196,18 @@ func TestRegistry_FetchAll(t *testing.T) {
 	if snapshots[1].Error == "" {
 		t.Error("expected non-empty error for fail-provider")
 	}
+	if !strings.Contains(snapshots[1].Error, `provider "fail-provider" fetch failed`) {
+		t.Errorf("expected explicit fetch-failed hint, got %q", snapshots[1].Error)
+	}
+	if snapshots[1].Metrics == nil {
+		t.Error("expected metrics to be [] for failed provider, got nil")
+	}
+	if len(snapshots[1].Metrics) != 0 {
+		t.Errorf("expected empty metrics for failed provider, got %d", len(snapshots[1].Metrics))
+	}
+	if !strings.Contains(warnings, `Warning: provider "fail-provider" (test-sub-fail) fetch failed`) {
+		t.Errorf("expected warning for fail-provider, got %q", warnings)
+	}
 
 	// Third: not registered
 	if snapshots[2].Status != StatusError {
@@ -159,5 +215,44 @@ func TestRegistry_FetchAll(t *testing.T) {
 	}
 	if snapshots[2].Error == "" {
 		t.Error("expected non-empty error for not-registered provider")
+	}
+	if snapshots[2].Metrics == nil {
+		t.Error("expected metrics to be [] for not-registered provider, got nil")
+	}
+	if len(snapshots[2].Metrics) != 0 {
+		t.Errorf("expected empty metrics for not-registered provider, got %d", len(snapshots[2].Metrics))
+	}
+}
+
+func TestRegistry_FetchAll_StatusErrorSnapshotUsesEmptyMetrics(t *testing.T) {
+	r := NewRegistry()
+	p := &mockProvider{id: "status-provider", displayName: "Status Provider", statusError: true}
+	if err := r.Register(p); err != nil {
+		t.Fatalf("register provider: %v", err)
+	}
+
+	entries := []SubscriptionEntry{{Provider: "status-provider", Name: "status-sub"}}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var snapshots []UsageSnapshot
+	warnings := captureStderr(t, func() {
+		snapshots = r.FetchAll(ctx, entries)
+	})
+
+	if len(snapshots) != 1 {
+		t.Fatalf("expected 1 snapshot, got %d", len(snapshots))
+	}
+	if snapshots[0].Status != StatusError {
+		t.Fatalf("expected status error, got %s", snapshots[0].Status)
+	}
+	if snapshots[0].Metrics == nil {
+		t.Fatal("expected metrics to be [] for status-error snapshot, got nil")
+	}
+	if len(snapshots[0].Metrics) != 0 {
+		t.Fatalf("expected empty metrics, got %d", len(snapshots[0].Metrics))
+	}
+	if !strings.Contains(warnings, `Warning: provider "status-provider" (status-sub) fetch failed`) {
+		t.Errorf("expected warning for status-provider, got %q", warnings)
 	}
 }

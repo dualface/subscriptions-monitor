@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -68,42 +70,72 @@ func (r *Registry) FetchAll(ctx context.Context, entries []SubscriptionEntry) []
 			defer wg.Done()
 
 			if ctx.Err() != nil {
+				errMsg := ctx.Err().Error()
 				results[idx] = UsageSnapshot{
 					ProviderID: e.Provider,
 					Name:       e.Name,
+					Metrics:    []UsageMetric{},
 					Status:     StatusError,
-					Error:      ctx.Err().Error(),
+					Error:      errMsg,
 				}
+				logFetchWarning(e.Provider, e.Name, errMsg)
 				return
 			}
 
 			p, ok := r.Get(e.Provider)
 			if !ok {
+				errMsg := fmt.Sprintf("provider %q not registered", e.Provider)
 				results[idx] = UsageSnapshot{
 					ProviderID: e.Provider,
 					Name:       e.Name,
+					Metrics:    []UsageMetric{},
 					Status:     StatusError,
-					Error:      fmt.Sprintf("provider %q not registered", e.Provider),
+					Error:      errMsg,
 				}
+				logFetchWarning(e.Provider, e.Name, errMsg)
 				return
 			}
 
 			snap, err := p.FetchUsage(ctx, e.Auth)
 			if err != nil {
+				errMsg := fmt.Sprintf("provider %q fetch failed: %v", e.Provider, err)
 				results[idx] = UsageSnapshot{
 					ProviderID:  e.Provider,
 					DisplayName: p.DisplayName(),
 					Name:        e.Name,
+					Metrics:     []UsageMetric{},
 					Status:      StatusError,
-					Error:       err.Error(),
+					Error:       errMsg,
 				}
+				logFetchWarning(e.Provider, e.Name, errMsg)
 				return
 			}
 			snap.Name = e.Name
+			if snap.Status == StatusError && snap.Error != "" {
+				snap.Error = fmt.Sprintf("provider %q fetch failed: %s", e.Provider, snap.Error)
+				logFetchWarning(e.Provider, e.Name, snap.Error)
+			}
+			if snap.Status == StatusError && snap.Metrics == nil {
+				snap.Metrics = []UsageMetric{}
+			}
 			results[idx] = *snap
 		}(i, entry)
 	}
 
 	wg.Wait()
 	return results
+}
+
+func logFetchWarning(providerID, name, errMsg string) {
+	errMsg = strings.TrimSpace(errMsg)
+	if errMsg == "" {
+		return
+	}
+
+	if name != "" {
+		fmt.Fprintf(os.Stderr, "Warning: provider %q (%s) fetch failed: %s\n", providerID, name, errMsg)
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Warning: provider %q fetch failed: %s\n", providerID, errMsg)
 }
