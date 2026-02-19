@@ -31,6 +31,17 @@ subscriptions:
         session_id: "${ZENMUX_SESSION_ID}"
         session_id_sig: "${ZENMUX_SESSION_ID_SIG}"
 
+  - name: my-openai
+    provider: openai
+    auth:
+      type: cookie
+      extra:
+        bearer_token: "${OPENAI_CHATGPT_BEARER_TOKEN}"
+        cookie: "${OPENAI_CHATGPT_COOKIE}"
+        oai_device_id: "${OPENAI_OAI_DEVICE_ID}"
+        oai_client_build_number: "${OPENAI_OAI_CLIENT_BUILD_NUMBER}"
+        oai_client_version: "${OPENAI_OAI_CLIENT_VERSION}"
+
 # Application settings
 settings:
   timeout: 30s           # Request timeout for fetching data

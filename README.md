@@ -1,6 +1,6 @@
 # Subscriptions Monitor (sub-mon)
 
-AI service subscription usage monitor supporting Kimi, MiniMax, and ZenMux.
+AI service subscription usage monitor supporting Kimi, MiniMax, OpenAI, and ZenMux.
 
 ```text
 AI Subscriptions Usage
@@ -111,6 +111,27 @@ Required fields:
 - `session_id`: Session ID from cookies
 - `session_id_sig`: Session signature from cookies
 
+### OpenAI
+
+1. Open https://chatgpt.com and log in
+2. Open Developer Tools (F12) and go to **Network**
+3. Refresh the page and find request `GET /backend-api/wham/usage`
+4. Copy request values:
+   - `Authorization: Bearer ...` -> `bearer_token`
+   - `Cookie` (full cookie string) -> `cookie`
+   - `oai-device-id` (optional)
+   - `oai-client-build-number` (optional)
+   - `oai-client-version` (optional)
+
+Required fields:
+- `bearer_token`: ChatGPT web bearer token
+- `cookie`: Full cookie string for chatgpt.com
+
+Optional fields:
+- `oai_device_id`: `oai-device-id` request header
+- `oai_client_build_number`: `oai-client-build-number` request header
+- `oai_client_version`: `oai-client-version` request header
+
 ## Configuration
 
 Configuration file location: `~/.config/sub-mon/config.yaml`
@@ -122,7 +143,7 @@ See [config.example.yaml](config.example.yaml) for a complete configuration temp
 ```yaml
 subscriptions:
   - name: <subscription-name>
-    provider: <kimi|minimax|zenmux>
+    provider: <kimi|minimax|openai|zenmux>
     auth:
       type: cookie
       extra:
@@ -172,6 +193,21 @@ settings:
       session_id_sig: "${ZENMUX_SESSION_ID_SIG}"
 ```
 
+#### OpenAI
+
+```yaml
+- name: my-openai
+  provider: openai
+  auth:
+    type: cookie
+    extra:
+      bearer_token: "${OPENAI_CHATGPT_BEARER_TOKEN}"
+      cookie: "${OPENAI_CHATGPT_COOKIE}"
+      oai_device_id: "${OPENAI_OAI_DEVICE_ID}"
+      oai_client_build_number: "${OPENAI_OAI_CLIENT_BUILD_NUMBER}"
+      oai_client_version: "${OPENAI_OAI_CLIENT_VERSION}"
+```
+
 ### Environment Variables
 
 You can use environment variables in the config file using `${VAR_NAME}` syntax:
@@ -206,6 +242,7 @@ export KIMI_AUTH_TOKEN="your-token-here"
 
 - **Kimi Code**: Monitor daily request quotas and rate limits
 - **MiniMax**: Track per-model usage with window reset times
+- **OpenAI**: Track ChatGPT web usage from `backend-api/wham/usage`
 - **ZenMux**: Monitor 5h and 7d flow usage with cost breakdown
 
 ## API Server
