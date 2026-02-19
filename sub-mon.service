@@ -1,0 +1,22 @@
+[Unit]
+Description=Subscriptions Monitor API Service
+Documentation=https://github.com/user/subscriptions-monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sub-mon
+Group=sub-mon
+WorkingDirectory=/var/lib/sub-mon
+ExecStart=/usr/local/bin/sub-mon serve --host 0.0.0.0 --port 3456 --config /etc/sub-mon/config.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sub-mon
+
+[Install]
+WantedBy=multi-user.target
