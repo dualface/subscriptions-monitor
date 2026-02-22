@@ -61,7 +61,7 @@ install_service_file() {
 }
 
 install_config_if_needed() {
-  install -d -m 0750 "${INSTALL_CONFIG_DIR}"
+  install -d -m 0755 "${INSTALL_CONFIG_DIR}"
 
   if [[ ! -f "${INSTALL_CONFIG}" ]]; then
     if [[ -f "${SOURCE_CONFIG_EXAMPLE}" ]]; then
@@ -77,7 +77,7 @@ install_config_if_needed() {
 }
 
 prepare_runtime_dirs() {
-  install -d -m 0750 -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" "${SERVICE_WORKDIR}"
+  install -d -m 0755 -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" "${SERVICE_WORKDIR}"
 }
 
 reload_and_enable_service() {
