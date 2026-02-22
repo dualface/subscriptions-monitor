@@ -62,6 +62,7 @@ install_service_file() {
 
 install_config_if_needed() {
   install -d -m 0750 "${INSTALL_CONFIG_DIR}"
+  chown root:"${SERVICE_GROUP}" "${INSTALL_CONFIG_DIR}" 2>/dev/null || true
 
   if [[ ! -f "${INSTALL_CONFIG}" ]]; then
     if [[ -f "${SOURCE_CONFIG_EXAMPLE}" ]]; then
