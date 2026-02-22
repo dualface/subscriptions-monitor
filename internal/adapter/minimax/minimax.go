@@ -94,9 +94,9 @@ func (a *Adapter) FetchUsage(ctx context.Context, auth provider.AuthConfig) (*pr
 
 	if remainsResp != nil && len(remainsResp.ModelRemains) > 0 {
 		for _, remain := range remainsResp.ModelRemains {
-			remaining := remain.CurrentIntervalUsageCount
+			used := remain.CurrentIntervalUsageCount
 			total := remain.CurrentIntervalTotalCount
-			used := total - remaining
+			remaining := total - used
 
 			resetsAt := time.UnixMilli(remain.EndTime)
 
