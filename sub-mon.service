@@ -17,6 +17,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/sub-mon
+ReadOnlyPaths=/etc/sub-mon
 
 [Install]
 WantedBy=multi-user.target
