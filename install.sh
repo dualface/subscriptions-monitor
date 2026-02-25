@@ -67,14 +67,15 @@ install_config_if_needed() {
   if [[ ! -f "${INSTALL_CONFIG}" ]]; then
     if [[ -f "${SOURCE_CONFIG_EXAMPLE}" ]]; then
       install -m 0640 "${SOURCE_CONFIG_EXAMPLE}" "${INSTALL_CONFIG}"
+      chown root:"${SERVICE_GROUP}" "${INSTALL_CONFIG}" 2>/dev/null || true
       echo "Installed default config to ${INSTALL_CONFIG}"
       echo "Please edit it with your credentials before production use."
     else
       echo "Warning: ${INSTALL_CONFIG} does not exist and config.example.yaml was not found." >&2
     fi
+  else
+    echo "Keeping existing config: ${INSTALL_CONFIG}"
   fi
-
-  chown root:"${SERVICE_GROUP}" "${INSTALL_CONFIG}" 2>/dev/null || true
 }
 
 prepare_runtime_dirs() {
@@ -82,8 +83,28 @@ prepare_runtime_dirs() {
 }
 
 reload_and_enable_service() {
+  local was_enabled="false"
+  local was_active="false"
+
+  if systemctl is-enabled --quiet "${SERVICE_NAME}.service"; then
+    was_enabled="true"
+  fi
+
+  if systemctl is-active --quiet "${SERVICE_NAME}.service"; then
+    was_active="true"
+  fi
+
   systemctl daemon-reload
-  systemctl enable --now "${SERVICE_NAME}.service"
+
+  if [[ "${was_enabled}" != "true" ]]; then
+    systemctl enable "${SERVICE_NAME}.service"
+  fi
+
+  if [[ "${was_active}" == "true" ]]; then
+    systemctl restart "${SERVICE_NAME}.service"
+  else
+    systemctl start "${SERVICE_NAME}.service"
+  fi
 }
 
 show_status() {
