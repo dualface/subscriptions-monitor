@@ -39,8 +39,8 @@ func TestClient_GetUsages(t *testing.T) {
 					Limits: []LimitInfo{
 						{
 							Window: struct {
-								Duration int    `json:"duration"`
-								TimeUnit string `json:"timeUnit"`
+								Duration int            `json:"duration"`
+								TimeUnit FlexibleString `json:"timeUnit"`
 							}{
 								Duration: 300,
 								TimeUnit: "TIME_UNIT_MINUTE",

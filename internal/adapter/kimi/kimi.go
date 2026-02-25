@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/user/subscriptions-monitor/internal/provider"
@@ -85,59 +86,81 @@ func (a *Adapter) FetchUsage(ctx context.Context, auth provider.AuthConfig) (*pr
 	var metrics []provider.UsageMetric
 
 	for _, usage := range usagesResp.Usages {
-		// 主要额度（日额度）
-		if usage.Scope == "FEATURE_CODING" {
-			limit, _ := strconv.Atoi(usage.Detail.Limit)
-			used, _ := strconv.Atoi(usage.Detail.Used)
-			remaining, _ := strconv.Atoi(usage.Detail.Remaining)
+		if !isCodingScope(usage.Scope) {
+			continue
+		}
+
+		limit, _ := strconv.Atoi(string(usage.Detail.Limit))
+		used, _ := strconv.Atoi(string(usage.Detail.Used))
+		remaining, _ := strconv.Atoi(string(usage.Detail.Remaining))
+
+		metrics = append(metrics, provider.UsageMetric{
+			Name: "Daily Requests",
+			Window: provider.UsageWindow{
+				ID:       "daily",
+				Label:    "Daily",
+				ResetsAt: &usage.Detail.ResetTime,
+			},
+			Amount: provider.UsageAmount{
+				Used:      provider.Ptr(float64(used)),
+				Limit:     provider.Ptr(float64(limit)),
+				Remaining: provider.Ptr(float64(remaining)),
+				Unit:      "requests",
+			},
+		})
+
+		for _, limitInfo := range usage.Limits {
+			duration := limitInfo.Window.Duration
+			timeUnit := normalizeTimeUnit(string(limitInfo.Window.TimeUnit))
+
+			windowLabel := fmt.Sprintf("%d %s", duration, timeUnit)
+			if timeUnit == "TIME_UNIT_MINUTE" {
+				windowLabel = fmt.Sprintf("%dm", duration)
+			}
+
+			windowLimit, _ := strconv.Atoi(string(limitInfo.Detail.Limit))
+			windowUsed, _ := strconv.Atoi(string(limitInfo.Detail.Used))
+			windowRemaining, _ := strconv.Atoi(string(limitInfo.Detail.Remaining))
 
 			metrics = append(metrics, provider.UsageMetric{
-				Name: "Daily Requests",
+				Name: fmt.Sprintf("Window (%s)", windowLabel),
 				Window: provider.UsageWindow{
-					ID:       "daily",
-					Label:    "Daily",
-					ResetsAt: &usage.Detail.ResetTime,
+					ID:       "window",
+					Label:    windowLabel,
+					ResetsAt: &limitInfo.Detail.ResetTime,
 				},
 				Amount: provider.UsageAmount{
-					Used:      provider.Ptr(float64(used)),
-					Limit:     provider.Ptr(float64(limit)),
-					Remaining: provider.Ptr(float64(remaining)),
+					Used:      provider.Ptr(float64(windowUsed)),
+					Limit:     provider.Ptr(float64(windowLimit)),
+					Remaining: provider.Ptr(float64(windowRemaining)),
 					Unit:      "requests",
 				},
 			})
-
-			// 窗口限制（5分钟窗口）
-			for _, limitInfo := range usage.Limits {
-				duration := limitInfo.Window.Duration
-				timeUnit := limitInfo.Window.TimeUnit
-
-				windowLabel := fmt.Sprintf("%d %s", duration, timeUnit)
-				if timeUnit == "TIME_UNIT_MINUTE" {
-					windowLabel = fmt.Sprintf("%dm", duration)
-				}
-
-				windowLimit, _ := strconv.Atoi(limitInfo.Detail.Limit)
-				windowUsed, _ := strconv.Atoi(limitInfo.Detail.Used)
-				windowRemaining, _ := strconv.Atoi(limitInfo.Detail.Remaining)
-
-				metrics = append(metrics, provider.UsageMetric{
-					Name: fmt.Sprintf("Window (%s)", windowLabel),
-					Window: provider.UsageWindow{
-						ID:       "window",
-						Label:    windowLabel,
-						ResetsAt: &limitInfo.Detail.ResetTime,
-					},
-					Amount: provider.UsageAmount{
-						Used:      provider.Ptr(float64(windowUsed)),
-						Limit:     provider.Ptr(float64(windowLimit)),
-						Remaining: provider.Ptr(float64(windowRemaining)),
-						Unit:      "requests",
-					},
-				})
-			}
 		}
 	}
 
 	snap.Metrics = metrics
 	return snap, nil
+}
+
+func isCodingScope(scope FlexibleString) bool {
+	s := strings.TrimSpace(string(scope))
+	if s == "" {
+		return true
+	}
+	if s == "FEATURE_CODING" {
+		return true
+	}
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
+}
+
+func normalizeTimeUnit(unit string) string {
+	u := strings.TrimSpace(unit)
+	switch u {
+	case "5":
+		return "TIME_UNIT_MINUTE"
+	default:
+		return u
+	}
 }
